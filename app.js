@@ -1,5 +1,6 @@
 console.log("Starting Password Manager");
-var crypto = require('crypto');
+
+var crypto = require('crypto-js');
 var storage = require('node-persist');
 var argv = require('yargs')
   //Create Account Command
@@ -26,7 +27,7 @@ var argv = require('yargs')
       master_password: {
         demand: true,
         alias: 'm',
-        description: 'Master Password'
+        description: 'Master Password',
         string: 'string'
       }
     }).help('help');
@@ -43,7 +44,7 @@ var argv = require('yargs')
       master_password: {
         demand: true,
         alias: 'm',
-        description: 'Master Password'
+        description: 'Master Password',
         string: 'string'
       }
     }).help('help')
@@ -58,45 +59,39 @@ var data = argv;
 //Initialize Storage Sync
 //from node persist
 storage.initSync();
-//create
-  //name
-  //username
-  //password
-
-// get account name
-
 
 function get_accounts(master_password){
   //Pull from Persist
   var encrypted_accounts = storage.getItemSync('accounts');
+  var accounts = [];
   //Decrypt using master_password and passing in the encrypted_accounts
-  var bytes = crypto.AES.decrypt(encrypted_accounts, master_password);
-  //JSON Accounts
-  var accounts = JSON.parse(bytes.toString(crypto.enc.Utf8));
+  if(typeof encrypted_accounts !== 'undefined'){
+    var bytes = crypto.AES.decrypt(encrypted_accounts, master_password);
+    //JSON Accounts
+    accounts = JSON.parse(bytes.toString(crypto.enc.Utf8));
+  };
   return accounts;
 }
 
 function save_accounts(accounts,master_password){
-  //encrypt accounts
-  //set itemsync
+  //
+  var encrypted_accounts = crypto.AES.encrypt(JSON.stringify(accounts),master_password);
+  //Store in persist the encrypted data in accounts
+  storage.setItemSync('accounts', encrypted_accounts.toString(crypto.enc.Utf8));
   //return accounts array
+  return accounts;
 }
 
 function create_account(account, master_password){
-  // var accounts = storage.getItemSync('accounts');
-  // if (typeof accounts === 'undefined'){
-  //   accounts = [];
-  // }
-  // //push account data to accounts array
+  var accounts = get_accounts(master_password);
+  //push object created by create command into accounts hash
   accounts.push(account);
-  //Set as local storage
-  // storage.setItemSync('accounts',accounts)
-  //Return this data!
-  return account;
+  save_accounts(accounts, master_password);
+  //return account;
 };
 
 function get_account(account_name,master_password){
-  // var accounts = storage.getItemSync('accounts');
+  var accounts = get_accounts(master_password);
   var matched_account;
   accounts.forEach(function(account){
     if(account.account_name === account_name){
@@ -104,8 +99,6 @@ function get_account(account_name,master_password){
     }
   });
   return matched_account;
-  //iterate over accounts array return matching account
-  //else undefined
 };
 
 var execute_account_command = function(){
@@ -113,9 +106,8 @@ var execute_account_command = function(){
     var created_account = create_account({
       account_name: data.account_name,
       username: data.username,
-      password: data.password,
-      master_password: data.master_password
-    });
+      password: data.password
+    },data.master_password);
     console.log("Account Created");
     console.log(created_account);
   } else if(command==='get'){
@@ -124,4 +116,5 @@ var execute_account_command = function(){
     console.log(stored_account);
   }
 };
+
 execute_account_command();
